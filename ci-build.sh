@@ -33,6 +33,14 @@ pacman --noconfirm --needed -S git base-devel binutils
 # Install core build stuff
 pacman --noconfirm --needed -S mingw-w64-{i686,x86_64}-{crt,winpthreads,gcc,libtre,pkg-config,xz}
 
+# Hack: use 3rd party rust
+curl -OL http://repo.msys2.org/mingw/i686/mingw-w64-i686-rust-1.43.0-1-any.pkg.tar.zst
+curl -OL http://repo.msys2.org/mingw/x86_64/mingw-w64-x86_64-rust-1.43.0-1-any.pkg.tar.zst
+curl -OL http://repo.msys2.org/mingw/x86_64/mingw-w64-x86_64-gcc-libs-9.3.0-2-any.pkg.tar.xz
+curl -OL http://repo.msys2.org/mingw/i686/mingw-w64-i686-gcc-libs-9.3.0-2-any.pkg.tar.xz
+pacman -U --noconfirm mingw-w64-x86_64-rust-1.43.0-1-any.pkg.tar.zst mingw-w64-i686-rust-1.43.0-1-any.pkg.tar.zst
+pacman -U --noconfirm mingw-w64-x86_64-gcc-libs-9.3.0-2-any.pkg.tar.xz mingw-w64-i686-gcc-libs-9.3.0-2-any.pkg.tar.xz
+
 # Initiate git
 git_config user.email 'ci@msys2.org'
 git_config user.name  'MSYS2 Continuous Integration'
