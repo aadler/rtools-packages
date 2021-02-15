@@ -11,21 +11,25 @@ deploy_enabled && mkdir sourcepkg
 
 ## Remove packages
 #deploy_enabled && cd artifacts
-#execute 'Removing JAGS from repository' remove_from_repository "${PACMAN_REPOSITORY:-ci-build}" "jags"
+#execute 'Removing old python3 packages from index' remove_from_repository "${PACMAN_REPOSITORY:-ci-build}" "python3"
 #success 'Package removal successful'
 #exit 0
 
 # Depending on if this is an rtools40 or msys64 installation:
 if [[ $(cygpath -m /) == *"rtools40"* ]]; then
 	# rtools40: enable upstream msys2 (but keep rtools-base as primary)
-	curl -L https://raw.githubusercontent.com/r-windows/rtools-installer/master/disable-msys.patch | patch -d/ -R -p0
+	echo "Found preinstalled rtools40 compilers!"
 else
-	# msys64: remove preinstalled toolchains and swith to rtools40 repositories
+	# msys64: remove preinstalled toolchains
     pacman --noconfirm -Rcsu $(pacman -Qqe | grep "^mingw-w64-")
     pacman --noconfirm -Rcsu gcc pkg-config
-    cp -f pacman.conf /etc/pacman.conf
 fi
 
+# Temp hack for weird msys2 flag
+sed -i 's/,--default-image-base-high//' /etc/makepkg_mingw64.conf
+
+# Enable upstream msys2 repo
+cp -f pacman.conf /etc/pacman.conf
 pacman --noconfirm -Scc
 pacman --noconfirm -Syyu
 pacman --noconfirm --needed -S git base-devel binutils
@@ -57,7 +61,7 @@ export PKG_CONFIG="/${MINGW_INSTALLS}/bin/pkg-config --static"
 export PKGEXT='.pkg.tar.xz'
 
 for package in "${packages[@]}"; do
-    execute 'Building binary' makepkg-mingw --noconfirm --noprogressbar --skippgpcheck --nocheck --syncdeps --rmdeps --cleanbuild
+    execute 'Building binary' makepkg-mingw --noconfirm --noprogressbar --skippgpcheck --syncdeps --rmdeps --cleanbuild
     execute 'Building source' makepkg --noconfirm --noprogressbar --skippgpcheck --allsource --config '/etc/makepkg_mingw64.conf'
     execute 'List output contents' ls -ltr
     execute 'Installing' yes:pacman --noprogressbar --upgrade *.pkg.tar.xz

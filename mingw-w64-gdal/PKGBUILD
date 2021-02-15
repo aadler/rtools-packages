@@ -7,8 +7,8 @@
 _realname=gdal
 pkgbase=mingw-w64-${_realname}
 pkgname="${MINGW_PACKAGE_PREFIX}-${_realname}"
-pkgver=3.0.4
-pkgrel=2
+pkgver=3.2.1
+pkgrel=1
 pkgdesc="A translator library for raster geospatial data formats (mingw-w64)"
 arch=('any')
 url="https://gdal.org/"
@@ -44,12 +44,9 @@ depends=("${MINGW_PACKAGE_PREFIX}-cfitsio"
 #optdepends=("${MINGW_PACKAGE_PREFIX}-postgresql")
 options=('strip' 'staticlibs')
 source=(https://download.osgeo.org/${_realname}/${pkgver}/${_realname}-${pkgver}.tar.gz)
-sha256sums=('fc15d2b9107b250305a1e0bd8421dd9ec1ba7ac73421e4509267052995af5e83')
+sha256sums=('43d40ba940e3927e38f9e98062ff62f9fa993ceade82f26f16fab7e73edb572e')
 
 prepare() {
-  #cd ${_realname}-${pkgver}
-  #patch -p2 -i ${srcdir}/0002-poppler-compatibility.patch
-
   cd ${srcdir}
   [[ -d ${srcdir}/build-${MINGW_CHOST} ]] && rm -rf ${srcdir}/build-${MINGW_CHOST}
   cp -rf ${_realname}-${pkgver} build-${MINGW_CHOST}
@@ -83,8 +80,8 @@ prepare() {
   PROJLIBS=$(pkg-config --libs-only-l --static proj)
   #sed -i "s/-lproj/${PROJLIBS}/g" configure.ac
 
-  # Spatialite
-  SPATIALLIBS=$(pkg-config --libs-only-l --static spatialite)
+  # Be careful: libcrypto.a and libxml2.a contain duplicate symbols
+  SPATIALLIBS="-lspatialite -lxml2 -lproj -lgeos_c -lgeos $(pkg-config --libs-only-l --static freexl sqlite3 libtiff-4 libcurl)"
   #sed -i "s/-lspatialite/${SPATIALLIBS}/g" configure.ac
 
   ./autogen.sh
@@ -140,16 +137,22 @@ build() {
     --with-netcdf="${MINGW_PREFIX}" \
     --with-crypto \
     --with-spatialite="yes" \
-    --with-liblzma \
+    --with-liblzma
 
   sed -i GDALmake.opt -e "s|EXE_DEP_LIBS.*|EXE_DEP_LIBS = \$\(GDAL_SLIB\)|g"
   sed -i GNUmakefile -e "s|\$(GDAL_ROOT)\/||g"
 
   # mariadb_config seems broken
-  sed -i GDALmake.opt -e "s|-lmariadb|-lmariadbclient -lssl -lcrypto -lcrypt32 -lgdi32 -lz -lws2_32 -pthread|g"
-  grep -o "[^/]*\.a.*undefined reference to.*$" config.log | sed 's/(.*)//g'
-  if [[ "$(grep '\.a.*undefined reference to' config.log)" ]]; then
-    echo "Configure script had linking errors, please fix these first"
+  sed -i GDALmake.opt -e "s|-lmariadb|-lmariadbclient -lssl -lcrypto -lcrypt32 -lgdi32 -lz -lws2_32 -lshlwapi -pthread|g"
+
+  # Print some output for debugging
+  if grep -o "[^/]*\.a.*undefined reference to.*$" config.log; then
+    echo "Found static linking errors in config.log. Drivers may have been disabled."
+    exit 1
+  fi
+
+  if grep -o "[^/]*\.a.*multiple definition of.*$" config.log; then
+    echo "Found symbol collisions config.log. Drivers may have been disabled."
     exit 1
   fi
 

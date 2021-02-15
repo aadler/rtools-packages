@@ -55,13 +55,26 @@ To enable the upstream msys repo, open the file `c:\rtools40\etc\pacman.conf` in
 Include = /etc/pacman.d/mirrorlist.msys
 ```
 
+__Update (July 2020):__ upstream msys2 has [changed to new signing keys](https://www.msys2.org/news/#2020-06-29-new-packagers) which are currently not included with rtools40. If you get PGP key errors after enabling msys2 repositories, the easiest workaround is to add a line with `SigLevel = Never` underneath the `Include` line mentioned above.
+
 Now update the runtime system: open the rtools40 shell and run `pacman -Syu`. In some cases, this may first upgrade `msys-runtime` or `bash` which you are currently using, which causes the terminal window to freeze after the upgrade. Don't worry, this is expected and happens only once. Close the window and restart the rtools40 shell, and run `pacman -Syu` again.
 
 Once the msys repo is enabled, you can install extra tools needed to build libraries and other software. For example you can install autoconf or vim and so on:
 
-```
+```sh
 pacman -S autoconf automake libtool
 pacman -S vim
 ```
 
 Rtools40 will never install anything outside of your rtools40 installation directory. So if you somehow messed up the installation beyond repair, simply reinstall rtools40 to start over.
+
+## ccache
+
+To speed up repetitive builds during packaging, install and enable `ccache`:
+
+1. mingw64
+    1. Install it in the mingw64 shell with `pacman -S mingw-w64-x86_64-ccache`
+    1. Edit `/etc/makepkg_mingw64.conf`, add a line containing `PATH="/mingw64/lib/ccache/bin:${PATH}"`
+1. mingw32
+    1. Install it in the mingw32 shell with `pacman -S mingw-w64-i686-ccache`
+    1. Edit `/etc/makepkg_mingw32.conf`, add a line containing `PATH="/mingw32/lib/ccache/bin:${PATH}"`

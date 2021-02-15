@@ -6,7 +6,7 @@ Function InstallMSYS64 {
 	$tarPath = "$($env:USERPROFILE)\msys2-x86_64-latest.tar"
 
 	Write-Host "Downloading MSYS installation package..."
-	(New-Object Net.WebClient).DownloadFile('http://repo.msys2.org/distrib/msys2-x86_64-latest.tar.xz', $zipPath)
+	(New-Object Net.WebClient).DownloadFile('https://github.com/msys2/msys2-installer/releases/download/2020-05-17/msys2-base-x86_64-20200517.tar.xz', $zipPath)
 
 	Write-Host "Untaring installation package..."
 	7z x $zipPath -y -o"$env:USERPROFILE" | Out-Null
@@ -18,6 +18,13 @@ Function InstallMSYS64 {
 
 	Write-Host "Initiating pacman..."
 	C:\msys64\usr\bin\bash.exe --login -c exit
+
+	# Workaround: revert to working version of pacman right now (avoid zstd/runtime breakage) remove when this is fixed upstream
+	C:\msys64\usr\bin\pacman --noconfirm -Sy
+	C:\msys64\usr\bin\pacman --noconfirm --needed -S bash pacman
+	C:\msys64\usr\bin\pacman --noconfirm -Suu
+	taskkill /IM gpg-agent.exe /F
+	taskkill /IM dirmngr.exe /F
 }
 
 ##### Old stuff ###
@@ -51,14 +58,16 @@ Function InstallRtoolsZip {
 
 # Don't use installer when: (1) architecture doesn't match host (2) Dir C:/rtools40 already exists
 Function InstallRtoolsExe {
-	Write-Host "Installing ${RTOOLS_EXE}..." -ForegroundColor Cyan
-	$tmp = "$($env:USERPROFILE)\${RTOOLS_EXE}"	
-	(New-Object Net.WebClient).DownloadFile($RTOOLS_MIRROR + $RTOOLS_EXE, $tmp)
-	Start-Process -FilePath $tmp -ArgumentList /VERYSILENT -NoNewWindow -Wait
-#	CheckExitCode "Failed to install ${RTOOLS_EXE}"
-	Write-Host "Installation of ${RTOOLS_EXE} done!" -ForegroundColor Green
+	if ( Test-Path C:\rtools40 ) {
+		Write-Host "Existing rtools40 found. Skipping installation."
+	} else {
+		Write-Host "Installing ${RTOOLS_EXE}..." -ForegroundColor Cyan
+		$tmp = "$($env:USERPROFILE)\${RTOOLS_EXE}"
+		(New-Object Net.WebClient).DownloadFile($RTOOLS_MIRROR + $RTOOLS_EXE, $tmp)
+		Start-Process -FilePath $tmp -ArgumentList /VERYSILENT -NoNewWindow -Wait
+		Write-Host "Installation of ${RTOOLS_EXE} done!" -ForegroundColor Green
+	}
 }
-
 
 function bash($command) {
     Write-Host $command -NoNewline
