@@ -5,6 +5,8 @@ on:
     paths:
       - 'mingw-w64-*/*'
   pull_request:
+    paths:
+      - 'mingw-w64-*/*'
 
 jobs:
   build:
@@ -12,8 +14,9 @@ jobs:
     strategy:
       matrix:
         include: [
-          { msystem: mingw64 },
-          { msystem: mingw32 }
+          { msystem: mingw32, toolchain: i686 },
+          { msystem: mingw64, toolchain: x86_64 },
+          { msystem: ucrt64, toolchain: ucrt-x86_64 }
         ]
       fail-fast: false
     defaults:
@@ -27,28 +30,49 @@ jobs:
 
       - uses: msys2/setup-msys2@v2
         with:
-          msystem: ${{ matrix.msystem }}
+          msystem: MSYS
           install: git
           update: true
 
       - name: CI-Build
-        run: MINGW_INSTALLS=${{ matrix.msystem }} ./ci-build.sh
+        run: ./ci-build.sh
         env:
-          BUILD_URL: dummy
-          DEPLOY_PROVIDER: bintray
-          BINTRAY_TARGET: rtools
-          BINTRAY_REPOSITORY: ${{ matrix.msystem }}
+          BUILD_URL: https://github.com/${{github.repository}}/actions/runs/${{github.run_id}}
+          MINGW_ARCH: ${{ matrix.msystem }}
+          MINGW_TOOLCHAIN: ${{ matrix.toolchain }}
           PACMAN_REPOSITORY: ${{ matrix.msystem }}
-          BINTRAY_PACKAGE: ${{ matrix.msystem }}
 
       - name: "Upload binary package"
         uses: actions/upload-artifact@v2
+        if: success() && (matrix.msystem == 'ucrt64' || !contains(github.event.head_commit.message, 'ucrt-only'))
         with:
-          name: ${{ matrix.msystem }}-repo
+          name: ${{ matrix.msystem }}
           path: artifacts/
 
       - name: "Upload source package"
         uses: actions/upload-artifact@v2
+        if: success() && matrix.msystem == 'mingw64' && !contains(github.event.head_commit.message, 'ucrt-only')
         with:
           name: sources
           path: sourcepkg/
+
+  deploy:
+    name: Deploy to staging server
+    runs-on: ubuntu-20.04
+    needs: [build]
+    if: success() && github.ref == 'refs/heads/master'
+    steps:
+      - name: Get artifacts for deployment
+        uses: actions/download-artifact@v2
+      - id: deployment
+        name: Uploading files
+        run: |
+          ls -ltrR
+          mkdir -p ~/.ssh
+          echo "StrictHostKeyChecking no" > ~/.ssh/config
+          echo "${STAGINGKEY}" > ~/.ssh/id_rsa && chmod 400 ~/.ssh/id_rsa
+          echo 'put -pr .' | sftp "${STAGINGUSER}@ftp.opencpu.org:/rtools"
+          rm -f ~/.ssh/id_rsa
+        env:
+          STAGINGUSER: ${{ secrets.STAGINGUSER }}
+          STAGINGKEY: ${{ secrets.STAGINGKEY }}

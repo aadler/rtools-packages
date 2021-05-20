@@ -1,0 +1,11 @@
+prefix=
+exec_prefix=${prefix}
+libdir=${prefix}/lib
+includedir=${prefix}/include
+
+Name: v8
+Description: V8 JavaScript Engine
+Version: @VERSION@
+Requires: zlib
+Libs: -L${libdir} -lv8_monolith
+Cflags: -I${includedir} @CFLAGS@
